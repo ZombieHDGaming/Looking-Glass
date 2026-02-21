@@ -1,6 +1,6 @@
 /*
-Plugin Name
-Copyright (C) <Year> <Developer> <Email Address>
+OBS Looking Glass - Custom Dynamic Multiview Plugin
+Copyright (C) 2025
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
