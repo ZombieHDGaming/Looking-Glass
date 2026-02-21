@@ -61,12 +61,11 @@ static void GetScaleAndCenterPos(int baseCX, int baseCY, int windowCX, int windo
 			scaledCY = windowCY;
 	}
 
-	// Calculate centered position with symmetric margins
-	// Round up the left/top margin so any odd pixel goes to right/bottom
+	// Center the scaled content within the window area
 	int remainderX = windowCX - scaledCX;
 	int remainderY = windowCY - scaledCY;
-	x = (remainderX + 1) / 2;
-	y = (remainderY + 1) / 2;
+	x = remainderX / 2;
+	y = remainderY / 2;
 }
 
 CellRenderer::CellRenderer() {}

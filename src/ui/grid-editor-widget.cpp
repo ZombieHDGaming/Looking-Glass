@@ -265,12 +265,14 @@ void GridEditorWidget::paintEvent(QPaintEvent *)
 	int cellW = width() / cols_;
 	int cellH = height() / rows_;
 
-	// Draw grid lines
+	// Draw grid lines clipped to the actual grid area
+	int gridW = cellW * cols_;
+	int gridH = cellH * rows_;
 	painter.setPen(QColor(60, 60, 60));
 	for (int r = 0; r <= rows_; r++)
-		painter.drawLine(0, r * cellH, width(), r * cellH);
+		painter.drawLine(0, r * cellH, gridW, r * cellH);
 	for (int c = 0; c <= cols_; c++)
-		painter.drawLine(c * cellW, 0, c * cellW, height());
+		painter.drawLine(c * cellW, 0, c * cellW, gridH);
 
 	// Draw cells
 	for (int i = 0; i < cells_.size(); i++) {

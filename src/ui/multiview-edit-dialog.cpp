@@ -23,8 +23,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "../plugin.hpp"
 #include "../core/config-manager.hpp"
 
-#include <obs-frontend-api.h>
-
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
@@ -34,6 +32,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QGroupBox>
 #include <QDialogButtonBox>
 #include <QSpinBox>
+#include <QColorDialog>
 
 MultiviewEditDialog::MultiviewEditDialog(const MultiviewConfig &config, bool isNew, QWidget *parent)
 	: QDialog(parent),
@@ -53,22 +52,6 @@ MultiviewEditDialog::MultiviewEditDialog(const MultiviewConfig &config, bool isN
 		nameEdit_->setPlaceholderText(LG_TEXT("EditDialog.NamePlaceholder"));
 	nameLayout->addWidget(nameEdit_);
 	mainLayout->addLayout(nameLayout);
-
-	// Grid size
-	auto *sizeLayout = new QHBoxLayout();
-	sizeLayout->addWidget(new QLabel(LG_TEXT("EditDialog.Rows")));
-	rowsSpin_ = new QSpinBox();
-	rowsSpin_->setRange(1, 16);
-	rowsSpin_->setValue(config_.cells.isEmpty() ? GetConfigManager()->defaultTemplate().gridRows : config_.gridRows);
-	sizeLayout->addWidget(rowsSpin_);
-	sizeLayout->addSpacing(10);
-	sizeLayout->addWidget(new QLabel(LG_TEXT("EditDialog.Columns")));
-	colsSpin_ = new QSpinBox();
-	colsSpin_->setRange(1, 16);
-	colsSpin_->setValue(config_.cells.isEmpty() ? GetConfigManager()->defaultTemplate().gridCols : config_.gridCols);
-	sizeLayout->addWidget(colsSpin_);
-	sizeLayout->addStretch();
-	mainLayout->addLayout(sizeLayout);
 
 	// Two-pane layout
 	auto *paneLayout = new QHBoxLayout();
@@ -92,10 +75,51 @@ MultiviewEditDialog::MultiviewEditDialog(const MultiviewConfig &config, bool isN
 
 	paneLayout->addLayout(leftLayout, 3);
 
-	// Right pane: buttons
+	// Right pane: grid settings and buttons
 	auto *rightLayout = new QVBoxLayout();
-	rightLayout->addStretch();
 
+	// Grid size controls
+	auto *gridSettingsForm = new QFormLayout();
+	rowsSpin_ = new QSpinBox();
+	rowsSpin_->setRange(1, 16);
+	rowsSpin_->setValue(config_.cells.isEmpty() ? GetConfigManager()->defaultTemplate().gridRows : config_.gridRows);
+	gridSettingsForm->addRow(LG_TEXT("EditDialog.Rows"), rowsSpin_);
+
+	colsSpin_ = new QSpinBox();
+	colsSpin_->setRange(1, 16);
+	colsSpin_->setValue(config_.cells.isEmpty() ? GetConfigManager()->defaultTemplate().gridCols : config_.gridCols);
+	gridSettingsForm->addRow(LG_TEXT("EditDialog.Columns"), colsSpin_);
+
+	// Grid border width
+	borderWidthSpin_ = new QSpinBox();
+	borderWidthSpin_->setRange(1, 10);
+	borderWidthSpin_->setValue(config_.gridBorderWidth);
+	gridSettingsForm->addRow(LG_TEXT("EditDialog.BorderWidth"), borderWidthSpin_);
+
+	// Grid line color
+	gridLineColor_ = config_.gridLineColor;
+	lineColorBtn_ = new QPushButton(LG_TEXT("EditDialog.LineColorChoose"));
+	lineColorBtn_->setAutoFillBackground(true);
+	auto updateColorBtnStyle = [this]() {
+		lineColorBtn_->setStyleSheet(
+			QString("background-color: %1; color: %2;")
+				.arg(gridLineColor_.name())
+				.arg(gridLineColor_.lightness() > 127 ? "black" : "white"));
+	};
+	updateColorBtnStyle();
+	connect(lineColorBtn_, &QPushButton::clicked, this, [this, updateColorBtnStyle]() {
+		QColor c = QColorDialog::getColor(gridLineColor_, this, LG_TEXT("EditDialog.ChooseLineColor"));
+		if (c.isValid()) {
+			gridLineColor_ = c;
+			updateColorBtnStyle();
+		}
+	});
+	gridSettingsForm->addRow(LG_TEXT("EditDialog.LineColor"), lineColorBtn_);
+
+	rightLayout->addLayout(gridSettingsForm);
+	rightLayout->addSpacing(10);
+
+	// Widget action buttons
 	setWidgetBtn_ = new QPushButton(LG_TEXT("EditDialog.SetWidget"));
 	editWidgetBtn_ = new QPushButton(LG_TEXT("EditDialog.EditWidget"));
 	mergeBtn_ = new QPushButton(LG_TEXT("EditDialog.MergeWidgets"));
@@ -222,6 +246,8 @@ void MultiviewEditDialog::onConfirm()
 	config_.name = name;
 	config_.gridRows = gridEditor_->gridRows();
 	config_.gridCols = gridEditor_->gridCols();
+	config_.gridBorderWidth = borderWidthSpin_->value();
+	config_.gridLineColor = gridLineColor_;
 	config_.cells = gridEditor_->cells();
 
 	ConfigManager *cm = GetConfigManager();
@@ -300,34 +326,9 @@ void MultiviewEditDialog::loadTemplate(const TemplateConfig &tmpl)
 	rowsSpin_->blockSignals(false);
 	colsSpin_->blockSignals(false);
 
-	// If the template doesn't preserve sources, auto-fill placeholder cells
-	// with available scenes from the current scene collection
-	QVector<CellConfig> cells = tmpl.cells;
-	if (!tmpl.preserveSources) {
-		QStringList sceneNames;
-		struct obs_frontend_source_list sceneList = {};
-		obs_frontend_get_scenes(&sceneList);
-		for (size_t i = 0; i < sceneList.sources.num; i++) {
-			obs_source_t *src = sceneList.sources.array[i];
-			const char *name = obs_source_get_name(src);
-			if (name)
-				sceneNames.append(QString::fromUtf8(name));
-		}
-		obs_frontend_source_list_free(&sceneList);
-
-		int sceneIdx = 0;
-		for (int i = 0; i < cells.size(); i++) {
-			if (cells[i].widget.type == WidgetType::Placeholder && sceneIdx < sceneNames.size()) {
-				cells[i].widget.type = WidgetType::Scene;
-				cells[i].widget.sceneName = sceneNames[sceneIdx];
-				if (cells[i].widget.labelText.isEmpty())
-					cells[i].widget.labelText = sceneNames[sceneIdx];
-				sceneIdx++;
-			}
-		}
-	}
-
-	gridEditor_->setGrid(tmpl.gridRows, tmpl.gridCols, cells);
+	// Auto-fill is handled by the default template itself (in ConfigManager::defaultTemplate).
+	// User-created templates apply their cells as-is — placeholders stay as placeholders.
+	gridEditor_->setGrid(tmpl.gridRows, tmpl.gridCols, tmpl.cells);
 }
 
 MultiviewConfig MultiviewEditDialog::result() const
@@ -336,6 +337,8 @@ MultiviewConfig MultiviewEditDialog::result() const
 	mv.name = nameEdit_->text().trimmed();
 	mv.gridRows = gridEditor_->gridRows();
 	mv.gridCols = gridEditor_->gridCols();
+	mv.gridBorderWidth = borderWidthSpin_->value();
+	mv.gridLineColor = gridLineColor_;
 	mv.cells = gridEditor_->cells();
 	return mv;
 }

@@ -182,6 +182,8 @@ obs_data_t *MultiviewToData(const MultiviewConfig &mv)
 	obs_data_set_string(data, "name", mv.name.toUtf8().constData());
 	obs_data_set_int(data, "grid_rows", mv.gridRows);
 	obs_data_set_int(data, "grid_cols", mv.gridCols);
+	obs_data_set_int(data, "grid_border_width", mv.gridBorderWidth);
+	obs_data_set_string(data, "grid_line_color", mv.gridLineColor.name(QColor::HexArgb).toUtf8().constData());
 	obs_data_set_int(data, "geometry_x", mv.geometry.x());
 	obs_data_set_int(data, "geometry_y", mv.geometry.y());
 	obs_data_set_int(data, "geometry_w", mv.geometry.width());
@@ -208,10 +210,21 @@ MultiviewConfig MultiviewFromData(obs_data_t *data)
 	mv.name = QString::fromUtf8(obs_data_get_string(data, "name"));
 	mv.gridRows = (int)obs_data_get_int(data, "grid_rows");
 	mv.gridCols = (int)obs_data_get_int(data, "grid_cols");
+	mv.gridBorderWidth = (int)obs_data_get_int(data, "grid_border_width");
 	if (mv.gridRows <= 0)
 		mv.gridRows = 4;
 	if (mv.gridCols <= 0)
 		mv.gridCols = 4;
+	if (mv.gridBorderWidth <= 0)
+		mv.gridBorderWidth = 1;
+	if (mv.gridBorderWidth > 10)
+		mv.gridBorderWidth = 10;
+
+	QString lineColorStr = QString::fromUtf8(obs_data_get_string(data, "grid_line_color"));
+	if (!lineColorStr.isEmpty())
+		mv.gridLineColor = QColor(lineColorStr);
+	else
+		mv.gridLineColor = QColor(255, 255, 255);
 
 	int gx = (int)obs_data_get_int(data, "geometry_x");
 	int gy = (int)obs_data_get_int(data, "geometry_y");

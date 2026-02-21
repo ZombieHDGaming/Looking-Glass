@@ -22,6 +22,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QComboBox>
 #include <QLineEdit>
 #include <QSpinBox>
+#include <QPushButton>
 
 #include "../core/multiview-config.hpp"
 
@@ -61,6 +62,9 @@ private:
 	QPushButton *editWidgetBtn_;
 	QPushButton *mergeBtn_;
 	QPushButton *resetBtn_;
+	QSpinBox *borderWidthSpin_;
+	QPushButton *lineColorBtn_;
+	QColor gridLineColor_;
 
 	MultiviewConfig config_;
 	bool isNew_;

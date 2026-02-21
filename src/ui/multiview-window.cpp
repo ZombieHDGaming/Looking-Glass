@@ -199,9 +199,13 @@ void MultiviewWindow::calculateGridMetrics(int &gridW, int &gridH, int &offsetX,
 	int totalW = width();
 	int totalH = height();
 
-	// Reserve 1 pixel on each edge for the border lines to be fully visible
-	int availableW = totalW - 2;
-	int availableH = totalH - 2;
+	// QPainter draws lines centered on the coordinate. The outer grid lines
+	// sit at the grid edge, so half the pen width bleeds outward. Reserve
+	// enough margin on each side for that outward bleed.
+	int border = config_.gridBorderWidth;
+	int outerHalf = (border + 1) / 2; // ceil(border / 2)
+	int availableW = totalW - 2 * outerHalf;
+	int availableH = totalH - 2 * outerHalf;
 
 	// Calculate cell size maintaining 16:9 aspect ratio for the grid
 	float gridAspect = (float)(config_.gridCols * 16) / (float)(config_.gridRows * 9);
@@ -230,7 +234,7 @@ void MultiviewWindow::calculateGridMetrics(int &gridW, int &gridH, int &offsetX,
 	cellW = (float)intCellW;
 	cellH = (float)intCellH;
 
-	// Center the grid in the window (with the reserved margin)
+	// Center the grid in the window
 	offsetX = (totalW - gridW) / 2;
 	offsetY = (totalH - gridH) / 2;
 }
@@ -252,8 +256,13 @@ void MultiviewWindow::updateLayout()
 	cellWidth_ = cellW;
 	cellHeight_ = cellH;
 
-	// Border inside each cell (1 pixel on each side)
-	static const int kBorder = 1;
+	// QPainter draws lines centered on grid coordinates. For a pen of
+	// width W, the line extends floor(W/2) pixels on one side and
+	// ceil(W/2) on the other. The inward bleed into the cell is
+	// floor(W/2) — use that as the surface inset so content meets
+	// the grid line edge exactly.
+	int border = config_.gridBorderWidth;
+	int inset = border / 2;
 
 	// Use integer cell dimensions for consistent positioning
 	int intCellW = (int)cellW;
@@ -261,10 +270,10 @@ void MultiviewWindow::updateLayout()
 
 	for (int i = 0; i < config_.cells.size() && i < cellSurfaces_.size(); i++) {
 		const CellConfig &cell = config_.cells[i];
-		int x = offsetX + cell.col * intCellW + kBorder;
-		int y = offsetY + cell.row * intCellH + kBorder;
-		int w = cell.colSpan * intCellW - 2 * kBorder;
-		int h = cell.rowSpan * intCellH - 2 * kBorder;
+		int x = offsetX + cell.col * intCellW + inset;
+		int y = offsetY + cell.row * intCellH + inset;
+		int w = cell.colSpan * intCellW - 2 * inset;
+		int h = cell.rowSpan * intCellH - 2 * inset;
 		if (w < 1)
 			w = 1;
 		if (h < 1)
@@ -433,8 +442,8 @@ void MultiviewWindow::paintEvent(QPaintEvent *event)
 		}
 	}
 
-	QPen gridPen(Qt::white);
-	gridPen.setWidth(1);
+	QPen gridPen(config_.gridLineColor);
+	gridPen.setWidth(config_.gridBorderWidth);
 	painter.setPen(gridPen);
 
 	int intCellW = (int)cellWidth_;
