@@ -37,9 +37,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 QMap<QString, MultiviewWindow *> MultiviewWindow::openWindows_;
 
-MultiviewWindow::MultiviewWindow(const QString &name, QWidget *parent)
-	: QWidget(parent, Qt::Window),
-	  name_(name)
+MultiviewWindow::MultiviewWindow(const QString &name, QWidget *parent) : QWidget(parent, Qt::Window), name_(name)
 {
 	setAttribute(Qt::WA_DeleteOnClose);
 
@@ -193,8 +191,8 @@ void MultiviewWindow::initRenderers()
 	}
 }
 
-void MultiviewWindow::calculateGridMetrics(int &gridW, int &gridH, int &offsetX, int &offsetY,
-					    float &cellW, float &cellH) const
+void MultiviewWindow::calculateGridMetrics(int &gridW, int &gridH, int &offsetX, int &offsetY, float &cellW,
+					   float &cellH) const
 {
 	int totalW = width();
 	int totalH = height();

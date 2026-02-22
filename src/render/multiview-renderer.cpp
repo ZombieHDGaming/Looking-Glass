@@ -38,8 +38,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 // Calculates scale factor and centered position to fit baseCX x baseCY
 // content inside a windowCX x windowCY area while preserving aspect ratio.
-static void GetScaleAndCenterPos(int baseCX, int baseCY, int windowCX, int windowCY,
-				 int &x, int &y, float &scale, int &scaledCX, int &scaledCY)
+static void GetScaleAndCenterPos(int baseCX, int baseCY, int windowCX, int windowCY, int &x, int &y, float &scale,
+				 int &scaledCX, int &scaledCY)
 {
 	double windowAspect = (double)windowCX / (double)windowCY;
 	double baseAspect = (double)baseCX / (double)baseCY;

@@ -39,7 +39,8 @@ MultiviewEditDialog::MultiviewEditDialog(const MultiviewConfig &config, bool isN
 	  config_(config),
 	  isNew_(isNew)
 {
-	setWindowTitle(isNew ? LG_TEXT("EditDialog.CreateTitle") : QString(LG_TEXT("EditDialog.EditTitle")).arg(config.name));
+	setWindowTitle(isNew ? LG_TEXT("EditDialog.CreateTitle")
+			     : QString(LG_TEXT("EditDialog.EditTitle")).arg(config.name));
 	setMinimumSize(800, 550);
 
 	auto *mainLayout = new QVBoxLayout(this);
@@ -82,12 +83,14 @@ MultiviewEditDialog::MultiviewEditDialog(const MultiviewConfig &config, bool isN
 	auto *gridSettingsForm = new QFormLayout();
 	rowsSpin_ = new QSpinBox();
 	rowsSpin_->setRange(1, 16);
-	rowsSpin_->setValue(config_.cells.isEmpty() ? GetConfigManager()->defaultTemplate().gridRows : config_.gridRows);
+	rowsSpin_->setValue(config_.cells.isEmpty() ? GetConfigManager()->defaultTemplate().gridRows
+						    : config_.gridRows);
 	gridSettingsForm->addRow(LG_TEXT("EditDialog.Rows"), rowsSpin_);
 
 	colsSpin_ = new QSpinBox();
 	colsSpin_->setRange(1, 16);
-	colsSpin_->setValue(config_.cells.isEmpty() ? GetConfigManager()->defaultTemplate().gridCols : config_.gridCols);
+	colsSpin_->setValue(config_.cells.isEmpty() ? GetConfigManager()->defaultTemplate().gridCols
+						    : config_.gridCols);
 	gridSettingsForm->addRow(LG_TEXT("EditDialog.Columns"), colsSpin_);
 
 	// Grid border width
@@ -101,10 +104,9 @@ MultiviewEditDialog::MultiviewEditDialog(const MultiviewConfig &config, bool isN
 	lineColorBtn_ = new QPushButton(LG_TEXT("EditDialog.LineColorChoose"));
 	lineColorBtn_->setAutoFillBackground(true);
 	auto updateColorBtnStyle = [this]() {
-		lineColorBtn_->setStyleSheet(
-			QString("background-color: %1; color: %2;")
-				.arg(gridLineColor_.name())
-				.arg(gridLineColor_.lightness() > 127 ? "black" : "white"));
+		lineColorBtn_->setStyleSheet(QString("background-color: %1; color: %2;")
+						     .arg(gridLineColor_.name())
+						     .arg(gridLineColor_.lightness() > 127 ? "black" : "white"));
 	};
 	updateColorBtnStyle();
 	connect(lineColorBtn_, &QPushButton::clicked, this, [this, updateColorBtnStyle]() {
@@ -205,8 +207,8 @@ void MultiviewEditDialog::onTemplateChanged(int index)
 	if (!GetConfigManager()->hasTemplate(templateName))
 		return;
 
-	auto reply = QMessageBox::question(this, LG_TEXT("EditDialog.ApplyTemplate"), LG_TEXT("EditDialog.ApplyTemplateMsg"),
-					   QMessageBox::Yes | QMessageBox::No);
+	auto reply = QMessageBox::question(this, LG_TEXT("EditDialog.ApplyTemplate"),
+					   LG_TEXT("EditDialog.ApplyTemplateMsg"), QMessageBox::Yes | QMessageBox::No);
 	if (reply == QMessageBox::Yes) {
 		loadTemplate(GetConfigManager()->getTemplate(templateName));
 	}

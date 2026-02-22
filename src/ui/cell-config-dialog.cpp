@@ -34,9 +34,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <algorithm>
 
-CellConfigDialog::CellConfigDialog(const WidgetConfig &current, QWidget *parent)
-	: QDialog(parent),
-	  config_(current)
+CellConfigDialog::CellConfigDialog(const WidgetConfig &current, QWidget *parent) : QDialog(parent), config_(current)
 {
 	setWindowTitle(LG_TEXT("CellDialog.Title"));
 	setMinimumSize(600, 400);
@@ -144,16 +142,19 @@ CellConfigDialog::CellConfigDialog(const WidgetConfig &current, QWidget *parent)
 	if (typeIdx >= 0)
 		typeCombo_->setCurrentIndex(typeIdx);
 
-	int hIdx = labelHAlignCombo_->findData((int)(config_.labelHAlign & (Qt::AlignLeft | Qt::AlignHCenter | Qt::AlignRight)));
+	int hIdx = labelHAlignCombo_->findData(
+		(int)(config_.labelHAlign & (Qt::AlignLeft | Qt::AlignHCenter | Qt::AlignRight)));
 	if (hIdx >= 0)
 		labelHAlignCombo_->setCurrentIndex(hIdx);
 
-	int vIdx = labelVAlignCombo_->findData((int)(config_.labelVAlign & (Qt::AlignTop | Qt::AlignVCenter | Qt::AlignBottom)));
+	int vIdx = labelVAlignCombo_->findData(
+		(int)(config_.labelVAlign & (Qt::AlignTop | Qt::AlignVCenter | Qt::AlignBottom)));
 	if (vIdx >= 0)
 		labelVAlignCombo_->setCurrentIndex(vIdx);
 
 	// Connect signals
-	connect(typeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &CellConfigDialog::onTypeChanged);
+	connect(typeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+		&CellConfigDialog::onTypeChanged);
 	connect(fontBtn_, &QPushButton::clicked, this, &CellConfigDialog::onChooseFont);
 	connect(bgColorBtn_, &QPushButton::clicked, this, &CellConfigDialog::onChooseBgColor);
 
@@ -191,10 +192,8 @@ void CellConfigDialog::updateFontPreview()
 {
 	QString style = QFontDatabase::styleString(selectedFont_);
 
-	QString description = QString("%1 %2 %3pt")
-				      .arg(selectedFont_.family())
-				      .arg(style)
-				      .arg(selectedFont_.pointSize());
+	QString description =
+		QString("%1 %2 %3pt").arg(selectedFont_.family()).arg(style).arg(selectedFont_.pointSize());
 
 	fontPreviewLabel_->setText(description);
 	fontPreviewLabel_->setFont(selectedFont_);
@@ -203,9 +202,8 @@ void CellConfigDialog::updateFontPreview()
 void CellConfigDialog::updateBgColorPreview()
 {
 	int alpha = selectedBgColor_.alpha();
-	QString description = QString("%1 (%2% opacity)")
-				      .arg(selectedBgColor_.name(QColor::HexRgb))
-				      .arg(qRound(alpha / 255.0 * 100));
+	QString description =
+		QString("%1 (%2% opacity)").arg(selectedBgColor_.name(QColor::HexRgb)).arg(qRound(alpha / 255.0 * 100));
 
 	bgColorPreviewLabel_->setText(description);
 

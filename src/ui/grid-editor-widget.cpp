@@ -394,10 +394,12 @@ void GridEditorWidget::paintEvent(QPaintEvent *)
 					label = LG_TEXT("GridEditor.Canvas");
 					break;
 				case WidgetType::Scene:
-					label = cell.widget.sceneName.isEmpty() ? LG_TEXT("GridEditor.Scene") : cell.widget.sceneName;
+					label = cell.widget.sceneName.isEmpty() ? LG_TEXT("GridEditor.Scene")
+										: cell.widget.sceneName;
 					break;
 				case WidgetType::Source:
-					label = cell.widget.sourceName.isEmpty() ? LG_TEXT("GridEditor.Source") : cell.widget.sourceName;
+					label = cell.widget.sourceName.isEmpty() ? LG_TEXT("GridEditor.Source")
+										 : cell.widget.sourceName;
 					break;
 				case WidgetType::Placeholder:
 					label = LG_TEXT("GridEditor.Placeholder");

@@ -139,8 +139,8 @@ void ManageMultiviewsDialog::onRename()
 
 	QString oldName = listWidget_->currentItem()->text();
 	bool ok;
-	QString newName = QInputDialog::getText(this, LG_TEXT("ManageDialog.RenameMultiview"), LG_TEXT("ManageDialog.RenamePrompt"),
-						QLineEdit::Normal, oldName, &ok);
+	QString newName = QInputDialog::getText(this, LG_TEXT("ManageDialog.RenameMultiview"),
+						LG_TEXT("ManageDialog.RenamePrompt"), QLineEdit::Normal, oldName, &ok);
 	if (!ok || newName.trimmed().isEmpty() || newName.trimmed() == oldName)
 		return;
 
@@ -175,9 +175,9 @@ void ManageMultiviewsDialog::onDuplicate()
 
 	QString srcName = listWidget_->currentItem()->text();
 	bool ok;
-	QString newName =
-		QInputDialog::getText(this, LG_TEXT("ManageDialog.DuplicateMultiview"), LG_TEXT("ManageDialog.DuplicatePrompt"),
-				      QLineEdit::Normal, srcName + LG_TEXT("ManageDialog.DuplicateSuffix"), &ok);
+	QString newName = QInputDialog::getText(this, LG_TEXT("ManageDialog.DuplicateMultiview"),
+						LG_TEXT("ManageDialog.DuplicatePrompt"), QLineEdit::Normal,
+						srcName + LG_TEXT("ManageDialog.DuplicateSuffix"), &ok);
 	if (!ok || newName.trimmed().isEmpty())
 		return;
 
