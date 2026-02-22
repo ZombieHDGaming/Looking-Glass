@@ -221,7 +221,6 @@ void MultiviewEditDialog::onTemplateChanged(int index)
 
 void MultiviewEditDialog::onSelectionChanged()
 {
-	bool hasSelection = !gridEditor_->selectedPositions().isEmpty();
 	int cellIdx = gridEditor_->selectedCellIndex();
 	bool hasSingleCell = cellIdx >= 0;
 
