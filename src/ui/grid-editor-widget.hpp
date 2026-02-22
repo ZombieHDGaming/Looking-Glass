@@ -47,6 +47,7 @@ public:
 	void setWidgetForSelected(const WidgetConfig &widget);
 	bool canMergeSelected() const;
 	void mergeSelected();
+	bool canResetSelected() const;
 	void resetSelected();
 	void clearSelection();
 

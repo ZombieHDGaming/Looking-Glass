@@ -157,37 +157,93 @@ void GridEditorWidget::mergeSelected()
 	emit cellsChanged();
 }
 
-void GridEditorWidget::resetSelected()
+bool GridEditorWidget::canResetSelected() const
 {
-	int idx = selectedCellIndex();
-	if (idx < 0 || idx >= cells_.size())
-		return;
+	if (selectedPositions_.isEmpty())
+		return false;
 
-	const CellConfig &cell = cells_[idx];
-	if (cell.rowSpan == 1 && cell.colSpan == 1) {
-		// Already 1x1, just clear the widget
-		cells_[idx].widget = WidgetConfig();
-		rebuildOwnership();
-		update();
-		emit cellsChanged();
-		return;
+	// Single cell selection is always valid for reset
+	if (selectedCellIndex() >= 0)
+		return true;
+
+	// Multi-cell: must form a complete rectangle with no partial overlaps
+	int minR = INT_MAX, maxR = 0, minC = INT_MAX, maxC = 0;
+	for (const QPoint &p : selectedPositions_) {
+		minR = qMin(minR, p.y());
+		maxR = qMax(maxR, p.y());
+		minC = qMin(minC, p.x());
+		maxC = qMax(maxC, p.x());
 	}
 
-	int startRow = cell.row;
-	int startCol = cell.col;
-	int endRow = startRow + cell.rowSpan;
-	int endCol = startCol + cell.colSpan;
+	int expected = (maxR - minR + 1) * (maxC - minC + 1);
+	if ((int)selectedPositions_.size() != expected)
+		return false;
 
-	cells_.removeAt(idx);
-
-	// Create individual 1x1 cells
-	for (int r = startRow; r < endRow; r++) {
-		for (int c = startCol; c < endCol; c++) {
-			CellConfig newCell;
-			newCell.row = r;
-			newCell.col = c;
-			cells_.append(newCell);
+	for (int r = minR; r <= maxR; r++) {
+		for (int c = minC; c <= maxC; c++) {
+			if (!selectedPositions_.contains(QPoint(c, r)))
+				return false;
 		}
+	}
+
+	// Any existing merged cell must be fully inside the selection
+	QSet<int> touchedCells;
+	for (const QPoint &p : selectedPositions_) {
+		int idx = ownerAt(p.y(), p.x());
+		if (idx >= 0)
+			touchedCells.insert(idx);
+	}
+
+	for (int idx : touchedCells) {
+		const CellConfig &cell = cells_[idx];
+		for (int r = cell.row; r < cell.row + cell.rowSpan; r++) {
+			for (int c = cell.col; c < cell.col + cell.colSpan; c++) {
+				if (!selectedPositions_.contains(QPoint(c, r)))
+					return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+void GridEditorWidget::resetSelected()
+{
+	if (!canResetSelected())
+		return;
+
+	// Fast path: single 1x1 cell, just clear its widget
+	int singleIdx = selectedCellIndex();
+	if (singleIdx >= 0 && singleIdx < cells_.size()) {
+		const CellConfig &cell = cells_[singleIdx];
+		if (cell.rowSpan == 1 && cell.colSpan == 1) {
+			cells_[singleIdx].widget = WidgetConfig();
+			rebuildOwnership();
+			update();
+			emit cellsChanged();
+			return;
+		}
+	}
+
+	// Mass reset: remove all touched cells, replace with empty 1x1 cells
+	QSet<int> toRemove;
+	for (const QPoint &p : selectedPositions_) {
+		int idx = ownerAt(p.y(), p.x());
+		if (idx >= 0)
+			toRemove.insert(idx);
+	}
+
+	QList<int> sorted = toRemove.values();
+	std::sort(sorted.begin(), sorted.end(), std::greater<int>());
+	for (int idx : sorted)
+		cells_.removeAt(idx);
+
+	// Create individual empty 1x1 cells for each selected position
+	for (const QPoint &p : selectedPositions_) {
+		CellConfig newCell;
+		newCell.row = p.y();
+		newCell.col = p.x();
+		cells_.append(newCell);
 	}
 
 	selectedPositions_.clear();

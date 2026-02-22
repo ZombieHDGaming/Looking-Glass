@@ -29,6 +29,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QGroupBox>
 #include <QFormLayout>
 #include <QFontDialog>
+#include <QFontDatabase>
 #include <QColorDialog>
 
 #include <algorithm>
@@ -188,16 +189,9 @@ void CellConfigDialog::onChooseBgColor()
 
 void CellConfigDialog::updateFontPreview()
 {
-	// Build a descriptive string for the font
-	QString style;
-	if (selectedFont_.bold())
-		style += "Bold ";
-	if (selectedFont_.italic())
-		style += "Italic ";
-	if (selectedFont_.weight() == QFont::Light || selectedFont_.weight() == QFont::ExtraLight)
-		style += "Light ";
+	QString style = QFontDatabase::styleString(selectedFont_);
 
-	QString description = QString("%1 %2%3pt")
+	QString description = QString("%1 %2 %3pt")
 				      .arg(selectedFont_.family())
 				      .arg(style)
 				      .arg(selectedFont_.pointSize());

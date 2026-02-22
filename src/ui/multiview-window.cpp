@@ -256,13 +256,13 @@ void MultiviewWindow::updateLayout()
 	cellWidth_ = cellW;
 	cellHeight_ = cellH;
 
-	// QPainter draws lines centered on grid coordinates. For a pen of
-	// width W, the line extends floor(W/2) pixels on one side and
-	// ceil(W/2) on the other. The inward bleed into the cell is
-	// floor(W/2) — use that as the surface inset so content meets
-	// the grid line edge exactly.
+	// Cell surfaces are native child windows that paint over the parent's
+	// grid lines. The inset shrinks each surface so the grid lines remain
+	// visible in the gaps between surfaces. For pen width W, floor(W/2)
+	// is the ideal inset, but width 1 yields 0 which leaves no gap at
+	// all — so enforce a minimum of 1 whenever a border is configured.
 	int border = config_.gridBorderWidth;
-	int inset = border / 2;
+	int inset = border > 0 ? qMax(1, border / 2) : 0;
 
 	// Use integer cell dimensions for consistent positioning
 	int intCellW = (int)cellW;
@@ -442,8 +442,13 @@ void MultiviewWindow::paintEvent(QPaintEvent *event)
 		}
 	}
 
+	// The pen width must match the gap between cell surfaces (2 * inset)
+	// so the line fills the gap exactly. Using the raw border width can
+	// leave unfilled pixels when the gap is wider than the pen (border=1).
+	int border = config_.gridBorderWidth;
+	int inset = border > 0 ? qMax(1, border / 2) : 0;
 	QPen gridPen(config_.gridLineColor);
-	gridPen.setWidth(config_.gridBorderWidth);
+	gridPen.setWidth(2 * inset);
 	painter.setPen(gridPen);
 
 	int intCellW = (int)cellWidth_;

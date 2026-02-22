@@ -24,6 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <graphics/vec4.h>
 
 #include <QFont>
+#include <QFontDatabase>
 #include <QImage>
 #include <QPainter>
 #include <QPainterPath>
@@ -390,24 +391,30 @@ void CellRenderer::createLabelSource()
 	obs_data_set_string(settings, "font_face", font.family().toUtf8().constData());
 	obs_data_set_int(settings, "font_size", font.pointSize() > 0 ? font.pointSize() : 36);
 
-#ifdef _WIN32
-	// text_gdiplus uses a nested "font" object for font configuration
+	// Build font flags bitmask (bit 0 = bold, bit 1 = italic)
+	int fontFlags = 0;
+	if (font.bold())
+		fontFlags |= 1;
+	if (font.italic())
+		fontFlags |= 2;
+
+	// Derive the full style name (e.g. "Light Italic", "SemiBold") from
+	// the font's weight and italic properties so sub-weights are preserved.
+	QString style = QFontDatabase::styleString(font);
+	if (style.isEmpty())
+		style = QStringLiteral("Regular");
+
 	obs_data_t *fontData = obs_data_create();
 	obs_data_set_string(fontData, "face", font.family().toUtf8().constData());
 	obs_data_set_int(fontData, "size", font.pointSize() > 0 ? font.pointSize() : 36);
-	obs_data_set_int(fontData, "flags", font.bold() ? 1 : 0);
-	obs_data_set_string(fontData, "style", font.bold() ? "Bold" : "Regular");
+	obs_data_set_int(fontData, "flags", fontFlags);
+	obs_data_set_string(fontData, "style", style.toUtf8().constData());
 	obs_data_set_obj(settings, "font", fontData);
 	obs_data_release(fontData);
 
 	// White text with full opacity
 	obs_data_set_int(settings, "color1", 0xFFFFFFFF);
 	obs_data_set_int(settings, "color2", 0xFFFFFFFF);
-#else
-	// text_ft2_source settings
-	obs_data_set_int(settings, "color1", 0xFFFFFFFF);
-	obs_data_set_int(settings, "color2", 0xFFFFFFFF);
-#endif
 
 	labelSource_ = obs_source_create_private(GetTextSourceId(), "lg_label", settings);
 	obs_data_release(settings);

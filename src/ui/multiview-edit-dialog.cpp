@@ -227,7 +227,7 @@ void MultiviewEditDialog::onSelectionChanged()
 	editWidgetBtn_->setEnabled(hasSingleCell && cellIdx < gridEditor_->cells().size() &&
 				   gridEditor_->cells()[cellIdx].widget.type != WidgetType::None);
 	mergeBtn_->setEnabled(gridEditor_->canMergeSelected());
-	resetBtn_->setEnabled(hasSingleCell);
+	resetBtn_->setEnabled(gridEditor_->canResetSelected());
 }
 
 void MultiviewEditDialog::onConfirm()
