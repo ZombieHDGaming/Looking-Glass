@@ -126,6 +126,17 @@ void ConfigManager::removeTemplate(const QString &name)
 	}
 }
 
+void ConfigManager::renameTemplate(const QString &oldName, const QString &newName)
+{
+	if (!templates_.contains(oldName) || templates_.contains(newName))
+		return;
+	TemplateConfig t = templates_.take(oldName);
+	t.name = newName;
+	templates_[newName] = t;
+	saveTemplates();
+	emit templatesChanged();
+}
+
 TemplateConfig ConfigManager::defaultTemplate() const
 {
 	TemplateConfig t;

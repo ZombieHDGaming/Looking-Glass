@@ -51,6 +51,7 @@ public:
 	TemplateConfig getTemplate(const QString &name) const;
 	void addTemplate(const TemplateConfig &t);
 	void removeTemplate(const QString &name);
+	void renameTemplate(const QString &oldName, const QString &newName);
 	TemplateConfig defaultTemplate() const;
 
 	// JSON persistence

@@ -21,6 +21,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "../core/config-manager.hpp"
 #include "multiview-edit-dialog.hpp"
 #include "multiview-manage-dialog.hpp"
+#include "template-manage-dialog.hpp"
 #include "multiview-window.hpp"
 
 #include <obs-frontend-api.h>
@@ -84,6 +85,9 @@ void ToolsMenuManager::rebuildMenu()
 	QAction *manageAction = submenu_->addAction(LG_TEXT("ToolsMenu.ManageMultiviews"));
 	connect(manageAction, &QAction::triggered, this, &ToolsMenuManager::onManage);
 
+	QAction *manageTemplatesAction = submenu_->addAction(LG_TEXT("ToolsMenu.ManageTemplates"));
+	connect(manageTemplatesAction, &QAction::triggered, this, &ToolsMenuManager::onManageTemplates);
+
 	QStringList names = GetConfigManager()->multiviewNames();
 	if (!names.isEmpty()) {
 		submenu_->addSeparator();
@@ -140,6 +144,13 @@ void ToolsMenuManager::onManage()
 {
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
 	ManageMultiviewsDialog dlg(mainWindow);
+	dlg.exec();
+}
+
+void ToolsMenuManager::onManageTemplates()
+{
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+	ManageTemplatesDialog dlg(mainWindow);
 	dlg.exec();
 }
 

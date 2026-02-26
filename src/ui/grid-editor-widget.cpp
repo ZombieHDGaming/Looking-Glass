@@ -233,13 +233,23 @@ void GridEditorWidget::resetSelected()
 			toRemove.insert(idx);
 	}
 
+	// Collect ALL grid positions covered by the cells being removed,
+	// so we can create 1x1 replacements for every position (not just selected ones)
+	QSet<QPoint> positionsToFill;
+	for (int idx : toRemove) {
+		const CellConfig &cell = cells_[idx];
+		for (int r = cell.row; r < cell.row + cell.rowSpan; r++)
+			for (int c = cell.col; c < cell.col + cell.colSpan; c++)
+				positionsToFill.insert(QPoint(c, r));
+	}
+
 	QList<int> sorted = toRemove.values();
 	std::sort(sorted.begin(), sorted.end(), std::greater<int>());
 	for (int idx : sorted)
 		cells_.removeAt(idx);
 
-	// Create individual empty 1x1 cells for each selected position
-	for (const QPoint &p : selectedPositions_) {
+	// Create individual empty 1x1 cells for every position the removed cells occupied
+	for (const QPoint &p : positionsToFill) {
 		CellConfig newCell;
 		newCell.row = p.y();
 		newCell.col = p.x();

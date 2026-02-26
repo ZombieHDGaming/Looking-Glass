@@ -41,6 +41,7 @@ public:
 private slots:
 	void onCreateNew();
 	void onManage();
+	void onManageTemplates();
 	void onOpenMultiview(const QString &name);
 	void onEditMultiview(const QString &name);
 	void onSendToMainDisplay(const QString &name);

@@ -217,22 +217,23 @@ void MultiviewWindow::calculateGridMetrics(int &gridW, int &gridH, int &offsetX,
 		gridH = (int)(gridW / gridAspect);
 	}
 
-	// Calculate cell size first, then adjust grid size to be exact multiple
-	// This ensures the grid edges align perfectly with cell boundaries
+	// Ensure the remaining margin can be split evenly for symmetric centering.
+	// If the remainder would be odd, shrink the grid by 1 pixel so both
+	// margins are exactly equal.
+	if ((totalW - gridW) % 2 != 0)
+		gridW--;
+	if ((totalH - gridH) % 2 != 0)
+		gridH--;
+
+	// Keep cell sizes as floats. Individual cell positions are computed by
+	// rounding (col * cellW) to the nearest pixel, which distributes any
+	// sub-pixel remainder evenly across cells instead of dumping it all
+	// into the margins. This ensures grid edges align with cell boundaries
+	// (round(0 * cellW) == 0 and round(gridCols * cellW) == gridW).
 	cellW = (float)gridW / config_.gridCols;
 	cellH = (float)gridH / config_.gridRows;
 
-	// Round cell sizes down and recalculate grid size to be exact
-	int intCellW = (int)cellW;
-	int intCellH = (int)cellH;
-	gridW = intCellW * config_.gridCols;
-	gridH = intCellH * config_.gridRows;
-
-	// Update cell sizes to exact integer values
-	cellW = (float)intCellW;
-	cellH = (float)intCellH;
-
-	// Center the grid in the window
+	// Center the grid in the window (remainder is guaranteed even)
 	offsetX = (totalW - gridW) / 2;
 	offsetY = (totalH - gridH) / 2;
 }
@@ -262,16 +263,20 @@ void MultiviewWindow::updateLayout()
 	int border = config_.gridBorderWidth;
 	int inset = border > 0 ? qMax(1, border / 2) : 0;
 
-	// Use integer cell dimensions for consistent positioning
-	int intCellW = (int)cellW;
-	int intCellH = (int)cellH;
-
 	for (int i = 0; i < config_.cells.size() && i < cellSurfaces_.size(); i++) {
 		const CellConfig &cell = config_.cells[i];
-		int x = offsetX + cell.col * intCellW + inset;
-		int y = offsetY + cell.row * intCellH + inset;
-		int w = cell.colSpan * intCellW - 2 * inset;
-		int h = cell.rowSpan * intCellH - 2 * inset;
+		// Compute each cell's pixel boundaries by rounding individually.
+		// This distributes fractional remainders evenly across cells
+		// rather than accumulating them all into the margins.
+		int cellX = qRound(cell.col * cellW);
+		int cellNextX = qRound((cell.col + cell.colSpan) * cellW);
+		int cellY = qRound(cell.row * cellH);
+		int cellNextY = qRound((cell.row + cell.rowSpan) * cellH);
+
+		int x = offsetX + cellX + inset;
+		int y = offsetY + cellY + inset;
+		int w = (cellNextX - cellX) - 2 * inset;
+		int h = (cellNextY - cellY) - 2 * inset;
 		if (w < 1)
 			w = 1;
 		if (h < 1)
@@ -440,27 +445,26 @@ void MultiviewWindow::paintEvent(QPaintEvent *event)
 		}
 	}
 
-	// The pen width must match the gap between cell surfaces (2 * inset)
-	// so the line fills the gap exactly. Using the raw border width can
-	// leave unfilled pixels when the gap is wider than the pen (border=1).
+	// Use fillRect instead of pen-based drawLine for grid lines.
+	// QPainter::drawLine with even pen widths shifts the extra pixel to
+	// one side, causing a 1-pixel asymmetry between the left and right
+	// (or top and bottom) gaps around each cell. fillRect specifies the
+	// exact pixel rectangle, eliminating the pen-centering ambiguity.
 	int border = config_.gridBorderWidth;
 	int inset = border > 0 ? qMax(1, border / 2) : 0;
-	QPen gridPen(config_.gridLineColor);
-	gridPen.setWidth(2 * inset);
-	painter.setPen(gridPen);
-
-	int intCellW = (int)cellWidth_;
-	int intCellH = (int)cellHeight_;
+	int lineThick = 2 * inset; // line thickness in pixels
+	QColor lineColor = config_.gridLineColor;
 
 	// Draw vertical lines - only where there's a cell boundary
 	// A vertical line at column 'col' should be drawn between row positions
 	// only if the cells on either side are different
 	for (int col = 0; col <= config_.gridCols; col++) {
-		int x = gridOffsetX_ + col * intCellW;
+		int colPixel = qRound(col * cellWidth_);
+		int lineX = gridOffsetX_ + colPixel - inset;
 
 		// For edge lines (col 0 and col == gridCols), always draw full line
 		if (col == 0 || col == config_.gridCols) {
-			painter.drawLine(x, gridOffsetY_, x, gridOffsetY_ + gridHeight_);
+			painter.fillRect(lineX, gridOffsetY_ - inset, lineThick, gridHeight_ + 2 * inset, lineColor);
 			continue;
 		}
 
@@ -477,27 +481,31 @@ void MultiviewWindow::paintEvent(QPaintEvent *event)
 				segmentStart = row;
 			} else if (!needLine && segmentStart >= 0) {
 				// End the segment
-				int y1 = gridOffsetY_ + segmentStart * intCellH;
-				int y2 = gridOffsetY_ + row * intCellH;
-				painter.drawLine(x, y1, x, y2);
+				int startPixel = qRound(segmentStart * cellHeight_);
+				int endPixel = qRound(row * cellHeight_);
+				int y1 = gridOffsetY_ + startPixel - inset;
+				int segH = (endPixel - startPixel) + 2 * inset;
+				painter.fillRect(lineX, y1, lineThick, segH, lineColor);
 				segmentStart = -1;
 			}
 		}
 		// Close any open segment
 		if (segmentStart >= 0) {
-			int y1 = gridOffsetY_ + segmentStart * intCellH;
-			int y2 = gridOffsetY_ + gridHeight_;
-			painter.drawLine(x, y1, x, y2);
+			int startPixel = qRound(segmentStart * cellHeight_);
+			int y1 = gridOffsetY_ + startPixel - inset;
+			int segH = (gridHeight_ - startPixel) + 2 * inset;
+			painter.fillRect(lineX, y1, lineThick, segH, lineColor);
 		}
 	}
 
 	// Draw horizontal lines - only where there's a cell boundary
 	for (int row = 0; row <= config_.gridRows; row++) {
-		int y = gridOffsetY_ + row * intCellH;
+		int rowPixel = qRound(row * cellHeight_);
+		int lineY = gridOffsetY_ + rowPixel - inset;
 
 		// For edge lines (row 0 and row == gridRows), always draw full line
 		if (row == 0 || row == config_.gridRows) {
-			painter.drawLine(gridOffsetX_, y, gridOffsetX_ + gridWidth_, y);
+			painter.fillRect(gridOffsetX_ - inset, lineY, gridWidth_ + 2 * inset, lineThick, lineColor);
 			continue;
 		}
 
@@ -514,17 +522,20 @@ void MultiviewWindow::paintEvent(QPaintEvent *event)
 				segmentStart = col;
 			} else if (!needLine && segmentStart >= 0) {
 				// End the segment
-				int x1 = gridOffsetX_ + segmentStart * intCellW;
-				int x2 = gridOffsetX_ + col * intCellW;
-				painter.drawLine(x1, y, x2, y);
+				int startPixel = qRound(segmentStart * cellWidth_);
+				int endPixel = qRound(col * cellWidth_);
+				int x1 = gridOffsetX_ + startPixel - inset;
+				int segW = (endPixel - startPixel) + 2 * inset;
+				painter.fillRect(x1, lineY, segW, lineThick, lineColor);
 				segmentStart = -1;
 			}
 		}
 		// Close any open segment
 		if (segmentStart >= 0) {
-			int x1 = gridOffsetX_ + segmentStart * intCellW;
-			int x2 = gridOffsetX_ + gridWidth_;
-			painter.drawLine(x1, y, x2, y);
+			int startPixel = qRound(segmentStart * cellWidth_);
+			int x1 = gridOffsetX_ + startPixel - inset;
+			int segW = (gridWidth_ - startPixel) + 2 * inset;
+			painter.fillRect(x1, lineY, segW, lineThick, lineColor);
 		}
 	}
 }

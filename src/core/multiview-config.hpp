@@ -66,7 +66,7 @@ struct MultiviewConfig {
 	QString name;
 	int gridRows = 4;
 	int gridCols = 4;
-	int gridBorderWidth = 1;
+	int gridBorderWidth = 6;
 	QColor gridLineColor = QColor(255, 255, 255);
 	QVector<CellConfig> cells;
 	QRect geometry = QRect(100, 100, 1280, 720);
