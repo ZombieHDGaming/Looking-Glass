@@ -44,6 +44,7 @@ target_sources(
           src/ui/cell-config-dialog.cpp
           src/ui/multiview-edit-dialog.cpp
           src/ui/multiview-manage-dialog.cpp
+          src/ui/template-manage-dialog.cpp
           src/ui/multiview-window.cpp
           src/render/multiview-renderer.cpp
 )
