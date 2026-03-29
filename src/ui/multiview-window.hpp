@@ -69,8 +69,7 @@ private:
 	void saveWindowState();
 	void openEditDialog();
 	void updateTitle();
-	void calculateGridMetrics(int &gridW, int &gridH, int &offsetX, int &offsetY,
-				  float &cellW, float &cellH) const;
+	void calculateGridMetrics(int &gridW, int &gridH, int &offsetX, int &offsetY, float &cellW, float &cellH) const;
 
 	QString name_;
 	MultiviewConfig config_;
