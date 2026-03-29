@@ -164,6 +164,9 @@ MultiviewEditDialog::MultiviewEditDialog(const MultiviewConfig &config, bool isN
 	connect(colsSpin_, QOverload<int>::of(&QSpinBox::valueChanged), this, &MultiviewEditDialog::onGridSizeChanged);
 
 	onSelectionChanged();
+
+	// Lock the dialog to its laid-out size so it cannot be resized
+	layout()->setSizeConstraint(QLayout::SetFixedSize);
 }
 
 void MultiviewEditDialog::onSetWidget()

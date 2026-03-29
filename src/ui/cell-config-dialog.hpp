@@ -47,12 +47,16 @@ private slots:
 
 private:
 	void populateSubtypes();
+	void updateTypeVisibility();
 	void updateFontPreview();
 	void updateBgColorPreview();
 
 	// Widget type controls (left pane)
 	QComboBox *typeCombo_;
 	QComboBox *subtypeCombo_;
+	QLabel *subtypeLabel_;
+	QCheckBox *safeRegionCheck_;
+	QCheckBox *showStatusCheck_;
 
 	// Label controls (right pane)
 	QCheckBox *labelVisibleCheck_;

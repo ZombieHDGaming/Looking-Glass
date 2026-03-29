@@ -54,6 +54,9 @@ private:
 	void renderSource(obs_source_t *source, uint32_t cx, uint32_t cy);
 	void renderLabel(uint32_t cx, uint32_t cy);
 	void renderPlaceholderIcon(uint32_t cx, uint32_t cy);
+	void renderSafeAreas(int contentW, int contentH);
+	void initSafeAreaGeometry();
+	void renderStatusBorder(uint32_t cx, uint32_t cy);
 
 	void createLabelSource();
 	void destroyLabelSource();
@@ -63,6 +66,7 @@ private:
 	void createPlaceholderTexture();
 	void destroyPlaceholderTexture();
 	void destroyLabelBgTexture();
+	void destroySafeAreaGeometry();
 
 	obs_display_t *display_ = nullptr;
 	obs_source_t *labelSource_ = nullptr;
@@ -75,4 +79,12 @@ private:
 	QString placeholderSvgPath_;
 	CellConfig config_;
 	QWidget *surface_ = nullptr;
+
+	// EBU R 95 safe area vertex buffers (normalized 0-1 coordinates)
+	gs_vertbuffer_t *actionSafeVb_ = nullptr;
+	gs_vertbuffer_t *graphicsSafeVb_ = nullptr;
+	gs_vertbuffer_t *fourByThreeSafeVb_ = nullptr;
+	gs_vertbuffer_t *leftLineVb_ = nullptr;
+	gs_vertbuffer_t *topLineVb_ = nullptr;
+	gs_vertbuffer_t *rightLineVb_ = nullptr;
 };

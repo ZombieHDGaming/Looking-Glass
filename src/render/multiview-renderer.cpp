@@ -86,6 +86,12 @@ void CellRenderer::init(QWidget *surface, const CellConfig &config)
 	if (!surface_)
 		return;
 
+	// Skip display creation for None widgets to avoid unnecessary
+	// swap chain overhead. Each obs_display_t adds rendering cost
+	// even when the draw callback exits early.
+	if (config.widget.type == WidgetType::None)
+		return;
+
 	gs_init_data initData = {};
 	initData.cx = surface_->width();
 	initData.cy = surface_->height();
@@ -119,6 +125,7 @@ void CellRenderer::cleanup()
 	destroyLabelSource();
 	destroyLabelBgTexture();
 	destroyPlaceholderTexture();
+	destroySafeAreaGeometry();
 	surface_ = nullptr;
 }
 
@@ -151,10 +158,12 @@ void CellRenderer::render(uint32_t cx, uint32_t cy)
 	case WidgetType::Preview:
 		renderPreviewProgram(cx, cy, false);
 		renderLabel(cx, cy);
+		renderStatusBorder(cx, cy);
 		return;
 	case WidgetType::Program:
 		renderPreviewProgram(cx, cy, true);
 		renderLabel(cx, cy);
+		renderStatusBorder(cx, cy);
 		return;
 	case WidgetType::Canvas:
 		renderCanvas(cx, cy);
@@ -184,6 +193,214 @@ void CellRenderer::render(uint32_t cx, uint32_t cy)
 		obs_source_release(source);
 	}
 	renderLabel(cx, cy);
+	renderStatusBorder(cx, cy);
+}
+
+// Rec. ITU-R BT.1848-1 / EBU R 95 safe area constants
+#define OUTLINE_COLOR 0xFFD0D0D0
+#define LINE_LENGTH 0.1f
+#define ACTION_SAFE_PERCENT 0.035f
+#define GRAPHICS_SAFE_PERCENT 0.05f
+#define FOURBYTHREE_SAFE_PERCENT 0.1625f
+
+void CellRenderer::initSafeAreaGeometry()
+{
+	// Build pre-built vertex buffers with normalized 0-1 coordinates,
+	// matching OBS Studio's InitSafeAreas() from display-helpers.hpp.
+	// Already in graphics context (called from draw callback).
+
+	// Action safe margin (3.5% inset)
+	gs_render_start(true);
+	gs_vertex2f(ACTION_SAFE_PERCENT, ACTION_SAFE_PERCENT);
+	gs_vertex2f(ACTION_SAFE_PERCENT, 1 - ACTION_SAFE_PERCENT);
+	gs_vertex2f(1 - ACTION_SAFE_PERCENT, 1 - ACTION_SAFE_PERCENT);
+	gs_vertex2f(1 - ACTION_SAFE_PERCENT, ACTION_SAFE_PERCENT);
+	gs_vertex2f(ACTION_SAFE_PERCENT, ACTION_SAFE_PERCENT);
+	actionSafeVb_ = gs_render_save();
+
+	// Graphics safe margin (5% inset)
+	gs_render_start(true);
+	gs_vertex2f(GRAPHICS_SAFE_PERCENT, GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(GRAPHICS_SAFE_PERCENT, 1 - GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(1 - GRAPHICS_SAFE_PERCENT, 1 - GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(1 - GRAPHICS_SAFE_PERCENT, GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(GRAPHICS_SAFE_PERCENT, GRAPHICS_SAFE_PERCENT);
+	graphicsSafeVb_ = gs_render_save();
+
+	// 4:3 safe area for widescreen
+	gs_render_start(true);
+	gs_vertex2f(FOURBYTHREE_SAFE_PERCENT, GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(1 - FOURBYTHREE_SAFE_PERCENT, GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(1 - FOURBYTHREE_SAFE_PERCENT, 1 - GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(FOURBYTHREE_SAFE_PERCENT, 1 - GRAPHICS_SAFE_PERCENT);
+	gs_vertex2f(FOURBYTHREE_SAFE_PERCENT, GRAPHICS_SAFE_PERCENT);
+	fourByThreeSafeVb_ = gs_render_save();
+
+	// Center tick marks
+	gs_render_start(true);
+	gs_vertex2f(0.0f, 0.5f);
+	gs_vertex2f(LINE_LENGTH, 0.5f);
+	leftLineVb_ = gs_render_save();
+
+	gs_render_start(true);
+	gs_vertex2f(0.5f, 0.0f);
+	gs_vertex2f(0.5f, LINE_LENGTH);
+	topLineVb_ = gs_render_save();
+
+	gs_render_start(true);
+	gs_vertex2f(1.0f, 0.5f);
+	gs_vertex2f(1 - LINE_LENGTH, 0.5f);
+	rightLineVb_ = gs_render_save();
+}
+
+void CellRenderer::destroySafeAreaGeometry()
+{
+	obs_enter_graphics();
+	gs_vertexbuffer_destroy(actionSafeVb_);
+	gs_vertexbuffer_destroy(graphicsSafeVb_);
+	gs_vertexbuffer_destroy(fourByThreeSafeVb_);
+	gs_vertexbuffer_destroy(leftLineVb_);
+	gs_vertexbuffer_destroy(topLineVb_);
+	gs_vertexbuffer_destroy(rightLineVb_);
+	obs_leave_graphics();
+	actionSafeVb_ = nullptr;
+	graphicsSafeVb_ = nullptr;
+	fourByThreeSafeVb_ = nullptr;
+	leftLineVb_ = nullptr;
+	topLineVb_ = nullptr;
+	rightLineVb_ = nullptr;
+}
+
+void CellRenderer::renderSafeAreas(int contentW, int contentH)
+{
+	// Lazily create vertex buffers on first use (already in graphics context)
+	if (!actionSafeVb_)
+		initSafeAreaGeometry();
+
+	// Scale matrix from normalized 0-1 coordinates to content dimensions
+	matrix4 transform;
+	matrix4_identity(&transform);
+	transform.x.x = (float)contentW;
+	transform.y.y = (float)contentH;
+
+	gs_matrix_push();
+	gs_matrix_mul(&transform);
+
+	gs_effect_t *solid = obs_get_base_effect(OBS_EFFECT_SOLID);
+	gs_eparam_t *color = gs_effect_get_param_by_name(solid, "color");
+	gs_effect_set_color(color, OUTLINE_COLOR);
+
+	// Draw all six safe area elements in a single effect loop
+	while (gs_effect_loop(solid, "Solid")) {
+		gs_load_vertexbuffer(actionSafeVb_);
+		gs_draw(GS_LINESTRIP, 0, 0);
+
+		gs_load_vertexbuffer(graphicsSafeVb_);
+		gs_draw(GS_LINESTRIP, 0, 0);
+
+		gs_load_vertexbuffer(fourByThreeSafeVb_);
+		gs_draw(GS_LINESTRIP, 0, 0);
+
+		gs_load_vertexbuffer(leftLineVb_);
+		gs_draw(GS_LINESTRIP, 0, 0);
+
+		gs_load_vertexbuffer(topLineVb_);
+		gs_draw(GS_LINESTRIP, 0, 0);
+
+		gs_load_vertexbuffer(rightLineVb_);
+		gs_draw(GS_LINESTRIP, 0, 0);
+	}
+
+	gs_matrix_pop();
+}
+
+// OBS multiview-style status colors (ARGB)
+static const uint32_t previewColor = 0xFF00D000;
+static const uint32_t programColor = 0xFFD00000;
+
+void CellRenderer::renderStatusBorder(uint32_t cx, uint32_t cy)
+{
+	if (!config_.widget.showStatus)
+		return;
+
+	// Determine border color based on widget type and current OBS state
+	uint32_t borderColor = 0;
+
+	switch (config_.widget.type) {
+	// case WidgetType::Preview:
+	// 	borderColor = previewColor;
+	// 	break;
+	// case WidgetType::Program:
+	// 	borderColor = programColor;
+	// 	break;
+	case WidgetType::Scene: {
+		if (config_.widget.sceneName.isEmpty())
+			return;
+		QByteArray nameUtf8 = config_.widget.sceneName.toUtf8();
+
+		// Check if this scene is the current program scene
+		obs_source_t *programScene = obs_frontend_get_current_scene();
+		if (programScene) {
+			if (strcmp(obs_source_get_name(programScene), nameUtf8.constData()) == 0)
+				borderColor = programColor;
+			obs_source_release(programScene);
+		}
+
+		// Check if this scene is the current preview scene (studio mode)
+		if (!borderColor && obs_frontend_preview_program_mode_active()) {
+			obs_source_t *previewScene = obs_frontend_get_current_preview_scene();
+			if (previewScene) {
+				if (strcmp(obs_source_get_name(previewScene), nameUtf8.constData()) == 0)
+					borderColor = previewColor;
+				obs_source_release(previewScene);
+			}
+		}
+		break;
+	}
+	default:
+		return;
+	}
+
+	if (!borderColor)
+		return;
+
+	// Draw border as 4 filled strips around the cell edges
+	const int borderW = qMax(2, (int)(qMin(cx, cy) * 0.015f));
+
+	gs_effect_t *solid = obs_get_base_effect(OBS_EFFECT_SOLID);
+	gs_eparam_t *color = gs_effect_get_param_by_name(solid, "color");
+	gs_effect_set_color(color, borderColor);
+
+	gs_viewport_push();
+	gs_projection_push();
+	gs_set_viewport(0, 0, cx, cy);
+	gs_ortho(0.0f, (float)cx, 0.0f, (float)cy, -100.0f, 100.0f);
+
+	while (gs_effect_loop(solid, "Solid")) {
+		// Top strip
+		gs_draw_sprite(nullptr, 0, cx, borderW);
+
+		// Bottom strip
+		gs_matrix_push();
+		gs_matrix_translate3f(0.0f, (float)(cy - borderW), 0.0f);
+		gs_draw_sprite(nullptr, 0, cx, borderW);
+		gs_matrix_pop();
+
+		// Left strip
+		gs_matrix_push();
+		gs_matrix_translate3f(0.0f, (float)borderW, 0.0f);
+		gs_draw_sprite(nullptr, 0, borderW, cy - 2 * borderW);
+		gs_matrix_pop();
+
+		// Right strip
+		gs_matrix_push();
+		gs_matrix_translate3f((float)(cx - borderW), (float)borderW, 0.0f);
+		gs_draw_sprite(nullptr, 0, borderW, cy - 2 * borderW);
+		gs_matrix_pop();
+	}
+
+	gs_projection_pop();
+	gs_viewport_pop();
 }
 
 void CellRenderer::renderPreviewProgram(uint32_t cx, uint32_t cy, bool isProgram)
@@ -223,6 +440,9 @@ void CellRenderer::renderPreviewProgram(uint32_t cx, uint32_t cy, bool isProgram
 			obs_source_release(previewScene);
 		}
 	}
+
+	if (config_.widget.safeRegion)
+		renderSafeAreas(canvasW, canvasH);
 
 	gs_projection_pop();
 	gs_viewport_pop();
@@ -264,6 +484,8 @@ void CellRenderer::renderCanvas(uint32_t cx, uint32_t cy)
 		gs_set_viewport(offsetX, offsetY, scaledW, scaledH);
 		gs_ortho(0.0f, (float)canvasW, 0.0f, (float)canvasH, -100.0f, 100.0f);
 		obs_render_main_texture();
+		if (config_.widget.safeRegion)
+			renderSafeAreas(canvasW, canvasH);
 		gs_projection_pop();
 		gs_viewport_pop();
 		return;
@@ -301,6 +523,9 @@ void CellRenderer::renderCanvas(uint32_t cx, uint32_t cy)
 	// Render the canvas texture using OBS Canvas API
 	obs_render_canvas_texture(canvas);
 
+	if (config_.widget.safeRegion)
+		renderSafeAreas(canvasW, canvasH);
+
 	gs_projection_pop();
 	gs_viewport_pop();
 
@@ -328,6 +553,9 @@ void CellRenderer::renderSource(obs_source_t *source, uint32_t cx, uint32_t cy)
 	gs_ortho(0.0f, (float)srcW, 0.0f, (float)srcH, -100.0f, 100.0f);
 
 	obs_source_video_render(source);
+
+	if (config_.widget.safeRegion)
+		renderSafeAreas(srcW, srcH);
 
 	gs_projection_pop();
 	gs_viewport_pop();
@@ -470,38 +698,55 @@ void CellRenderer::renderLabel(uint32_t cx, uint32_t cy)
 	if (labelW == 0 || labelH == 0)
 		return;
 
-	// Calculate label position based on alignment settings
-	const int padding = 6;
+	// Scale the label proportionally to the cell size using the approach
+	// from OBS Studio's multiview. The label should occupy at most ~15%
+	// of the cell height and must fit within the cell width. The scale
+	// is capped at 1.0 so labels never upscale beyond their native size.
+	float maxH = (float)cy * 0.15f;
+	float heightScale = maxH / (float)labelH;
+	float widthScale = ((float)cx * 0.9f) / (float)labelW;
+	float scale = qMin(1.0f, qMin(heightScale, widthScale));
+
+	// Scaled label dimensions in cell pixels
+	int scaledW = qMax(1, (int)(labelW * scale));
+	int scaledH = qMax(1, (int)(labelH * scale));
+
+	// Scale padding proportionally
+	int padding = qMax(1, (int)(6.0f * scale));
+
+	// Calculate label position using scaled dimensions
 	int labelX = 0;
 	int labelY = 0;
 
 	// Horizontal alignment
 	Qt::Alignment hAlign = config_.widget.labelHAlign;
 	if (hAlign & Qt::AlignHCenter)
-		labelX = ((int)cx - (int)labelW) / 2;
+		labelX = ((int)cx - scaledW) / 2;
 	else if (hAlign & Qt::AlignRight)
-		labelX = (int)cx - (int)labelW - padding;
+		labelX = (int)cx - scaledW - padding;
 	else
 		labelX = padding;
 
 	// Vertical alignment
 	Qt::Alignment vAlign = config_.widget.labelVAlign;
 	if (vAlign & Qt::AlignVCenter)
-		labelY = ((int)cy - (int)labelH) / 2;
+		labelY = ((int)cy - scaledH) / 2;
 	else if (vAlign & Qt::AlignBottom)
-		labelY = (int)cy - (int)labelH - padding;
+		labelY = (int)cy - scaledH - padding;
 	else
 		labelY = padding;
 
-	// Draw rounded background rectangle behind the label if it has any opacity
+	// Draw rounded background rectangle behind the label if it has any opacity.
+	// The background texture is created at the scaled pixel size so it
+	// matches the label and is recreated when dimensions or color change.
 	QColor bgColor = config_.widget.labelBgColor;
 	if (bgColor.alpha() > 0) {
-		const int bgPad = 4;
-		const int bgRadius = 6;
+		int bgPad = qMax(1, (int)(4.0f * scale));
+		int bgRadius = qMax(1, (int)(6.0f * scale));
 		int bgX = labelX - bgPad;
 		int bgY = labelY - bgPad;
-		int bgW = (int)labelW + 2 * bgPad;
-		int bgH = (int)labelH + 2 * bgPad;
+		int bgW = scaledW + 2 * bgPad;
+		int bgH = scaledH + 2 * bgPad;
 
 		// Recreate cached texture only when dimensions or color change
 		if (!labelBgTexture_ || labelBgTexW_ != bgW || labelBgTexH_ != bgH || labelBgTexColor_ != bgColor) {
@@ -539,11 +784,13 @@ void CellRenderer::renderLabel(uint32_t cx, uint32_t cy)
 		}
 	}
 
-	// Render the text source as an overlay at the calculated position
+	// Render the text source scaled via viewport mapping: the viewport is
+	// set to the scaled pixel area while the ortho projection spans the
+	// original label dimensions, so the GPU performs the scaling.
 	gs_viewport_push();
 	gs_projection_push();
 
-	gs_set_viewport(labelX, labelY, labelW, labelH);
+	gs_set_viewport(labelX, labelY, scaledW, scaledH);
 	gs_ortho(0.0f, (float)labelW, 0.0f, (float)labelH, -100.0f, 100.0f);
 
 	obs_source_video_render(labelSource_);

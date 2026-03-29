@@ -70,7 +70,18 @@ CellConfigDialog::CellConfigDialog(const WidgetConfig &current, QWidget *parent)
 	typeLayout->addRow(LG_TEXT("CellDialog.Type"), typeCombo_);
 
 	subtypeCombo_ = new QComboBox();
-	typeLayout->addRow(LG_TEXT("CellDialog.Selection"), subtypeCombo_);
+	subtypeLabel_ = new QLabel(LG_TEXT("CellDialog.Selection"));
+	typeLayout->addRow(subtypeLabel_, subtypeCombo_);
+
+	safeRegionCheck_ = new QCheckBox(LG_TEXT("CellDialog.SafeRegion"));
+	safeRegionCheck_->setChecked(config_.safeRegion);
+	safeRegionCheck_->setToolTip(LG_TEXT("CellDialog.SafeRegionTooltip"));
+	typeLayout->addRow(safeRegionCheck_);
+
+	showStatusCheck_ = new QCheckBox(LG_TEXT("CellDialog.ShowStatus"));
+	showStatusCheck_->setChecked(config_.showStatus);
+	showStatusCheck_->setToolTip(LG_TEXT("CellDialog.ShowStatusTooltip"));
+	typeLayout->addRow(showStatusCheck_);
 
 	leftLayout->addLayout(typeLayout);
 	leftLayout->addStretch();
@@ -159,6 +170,7 @@ CellConfigDialog::CellConfigDialog(const WidgetConfig &current, QWidget *parent)
 	connect(bgColorBtn_, &QPushButton::clicked, this, &CellConfigDialog::onChooseBgColor);
 
 	populateSubtypes();
+	updateTypeVisibility();
 	updateFontPreview();
 	updateBgColorPreview();
 }
@@ -166,6 +178,22 @@ CellConfigDialog::CellConfigDialog(const WidgetConfig &current, QWidget *parent)
 void CellConfigDialog::onTypeChanged(int)
 {
 	populateSubtypes();
+	updateTypeVisibility();
+}
+
+void CellConfigDialog::updateTypeVisibility()
+{
+	WidgetType type = (WidgetType)typeCombo_->currentData().toInt();
+
+	// Selection dropdown only needed for types that have a subtype list
+	bool needsSelection = (type == WidgetType::Scene || type == WidgetType::Source || type == WidgetType::Canvas);
+	subtypeLabel_->setVisible(needsSelection);
+	subtypeCombo_->setVisible(needsSelection);
+
+	// Status border only applies to types that can be in preview/program
+	bool canShowStatus =
+		(/*type == WidgetType::Preview || type == WidgetType::Program ||*/ type == WidgetType::Scene);
+	showStatusCheck_->setVisible(canShowStatus);
 }
 
 void CellConfigDialog::onChooseFont()
@@ -302,6 +330,8 @@ WidgetConfig CellConfigDialog::result() const
 	w.labelText = labelTextEdit_->text();
 	w.labelFont = selectedFont_.toString();
 	w.labelBgColor = selectedBgColor_;
+	w.safeRegion = safeRegionCheck_->isChecked();
+	w.showStatus = showStatusCheck_->isChecked();
 
 	if (w.type == WidgetType::Scene)
 		w.sceneName = subtypeCombo_->currentText();

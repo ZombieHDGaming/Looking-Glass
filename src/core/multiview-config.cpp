@@ -115,6 +115,8 @@ obs_data_t *WidgetToData(const WidgetConfig &w)
 	obs_data_set_string(data, "label_text", w.labelText.toUtf8().constData());
 	obs_data_set_string(data, "label_font", w.labelFont.toUtf8().constData());
 	obs_data_set_string(data, "label_bg_color", w.labelBgColor.name(QColor::HexArgb).toUtf8().constData());
+	obs_data_set_bool(data, "safe_region", w.safeRegion);
+	obs_data_set_bool(data, "show_status", w.showStatus);
 	return data;
 }
 
@@ -137,6 +139,9 @@ WidgetConfig WidgetFromData(obs_data_t *data)
 		w.labelBgColor = QColor(bgColorStr);
 	else
 		w.labelBgColor = QColor(0, 0, 0, 128);
+
+	w.safeRegion = obs_data_get_bool(data, "safe_region");
+	w.showStatus = obs_data_get_bool(data, "show_status");
 
 	return w;
 }

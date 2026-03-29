@@ -50,6 +50,8 @@ struct WidgetConfig {
 	QString labelText;
 	QString labelFont;    // QFont::toString() format
 	QColor labelBgColor = QColor(0, 0, 0, 128); // Label background color with alpha
+	bool safeRegion = false;  // Draw broadcast safe area overlays
+	bool showStatus = false;  // Show preview/program border indicator
 };
 
 // Position and span of a single cell within the grid
