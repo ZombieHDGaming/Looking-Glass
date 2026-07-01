@@ -27,7 +27,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs-frontend-api.h>
 
 #include <QMainWindow>
-#include <QMenuBar>
 #include <QScreen>
 #include <QGuiApplication>
 
@@ -41,18 +40,7 @@ ToolsMenuManager::~ToolsMenuManager()
 
 void ToolsMenuManager::initialize()
 {
-	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
-	if (!mainWindow)
-		return;
-
-	// Find the Tools menu
-	QMenu *toolsMenu = nullptr;
-	for (QAction *action : mainWindow->menuBar()->actions()) {
-		if (action->menu() && action->text().contains("Tools", Qt::CaseInsensitive)) {
-			toolsMenu = action->menu();
-			break;
-		}
-	}
+	QMenu *toolsMenu = (QMenu *)obs_frontend_get_tools_menu();
 	if (!toolsMenu)
 		return;
 
