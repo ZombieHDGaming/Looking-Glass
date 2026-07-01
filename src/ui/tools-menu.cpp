@@ -27,6 +27,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs-frontend-api.h>
 
 #include <QMainWindow>
+#include <QMenuBar>
 #include <QScreen>
 #include <QGuiApplication>
 
@@ -40,7 +41,22 @@ ToolsMenuManager::~ToolsMenuManager()
 
 void ToolsMenuManager::initialize()
 {
-	QMenu *toolsMenu = (QMenu *)obs_frontend_get_tools_menu();
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+	if (!mainWindow)
+		return;
+
+	// OBS gives the Tools menu the stable Qt objectName "menuTools", so look it
+	// up by that instead of the localized display text. Fall back to scanning
+	// the menu bar's actions in case a future OBS release changes the name.
+	QMenu *toolsMenu = mainWindow->findChild<QMenu *>("menuTools");
+	if (!toolsMenu) {
+		for (QAction *action : mainWindow->menuBar()->actions()) {
+			if (action->menu() && action->objectName() == "menuTools") {
+				toolsMenu = action->menu();
+				break;
+			}
+		}
+	}
 	if (!toolsMenu)
 		return;
 
