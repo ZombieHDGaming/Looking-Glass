@@ -1,5 +1,46 @@
 # OBS Plugin Template
 
+## Controlling Multiviews from obs-websocket
+
+Looking Glass registers an obs-websocket vendor named `looking-glass`, so multiview
+windows can be opened, closed, and sent to the main display from outside OBS Studio
+(Stream Deck, Companion, custom tooling) — the same actions offered by the
+`Tools ▸ Looking Glass ▸ <multiview name>` submenus.
+
+Call them with obs-websocket's `CallVendorRequest` request:
+
+| Request type                 | Description                                                                   |
+|------------------------------|-------------------------------------------------------------------------------|
+| `OpenMultiview`              | Opens the multiview window, or focuses it if it is already open.               |
+| `CloseMultiview`             | Closes the multiview window. Succeeds as a no-op when it is not open.          |
+| `SendMultiviewToMainDisplay` | Opens the multiview if needed, then centers it as a 1280x720 window on the primary display. |
+
+Every request takes a single field, `multiviewName`, naming a multiview in the
+current scene collection:
+
+```json
+{
+  "requestType": "CallVendorRequest",
+  "requestData": {
+    "vendorName": "looking-glass",
+    "requestType": "OpenMultiview",
+    "requestData": {
+      "multiviewName": "Studio Wall"
+    }
+  }
+}
+```
+
+The vendor response data carries a `success` boolean, plus an `error` string
+describing the problem when `success` is `false`:
+
+```json
+{
+  "success": false,
+  "error": "No multiview named 'Studio Wall' exists in the current scene collection."
+}
+```
+
 ## Introduction
 
 The plugin template is meant to be used as a starting point for OBS Studio plugin development. It includes:

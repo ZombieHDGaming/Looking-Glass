@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 #include "plugin.hpp"
+#include "api/websocket-api.hpp"
 #include "core/config-manager.hpp"
 #include "ui/tools-menu.hpp"
 #include "ui/multiview-window.hpp"
@@ -77,6 +78,10 @@ static void on_frontend_event(enum obs_frontend_event event, void *)
 		break;
 
 	case OBS_FRONTEND_EVENT_EXIT:
+		// Drop the vendor requests while obs-websocket is still loaded; module
+		// unload order is not guaranteed, so it may be gone by obs_module_unload()
+		LookingGlassWebSocket::Unregister();
+
 		// Save open-window state before closing so they reopen on next launch
 		s_configManager->onSceneCollectionChanging();
 		MultiviewWindow::closeAll();
@@ -97,6 +102,13 @@ bool obs_module_load(void)
 	obs_frontend_add_event_callback(on_frontend_event, nullptr);
 
 	return true;
+}
+
+MODULE_EXPORT void obs_module_post_load(void)
+{
+	// obs-websocket's vendor API is only reachable once every module has been
+	// loaded, so registration cannot happen in obs_module_load()
+	LookingGlassWebSocket::Register();
 }
 
 void obs_module_unload(void)

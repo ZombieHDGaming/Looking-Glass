@@ -43,6 +43,7 @@ private slots:
 	void onManage();
 	void onManageTemplates();
 	void onOpenMultiview(const QString &name);
+	void onCloseMultiview(const QString &name);
 	void onEditMultiview(const QString &name);
 	void onSendToMainDisplay(const QString &name);
 	void onSetFullscreen(const QString &name, int screenIndex);

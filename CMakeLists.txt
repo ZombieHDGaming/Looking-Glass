@@ -36,19 +36,25 @@ endif()
 
 target_sources(
   ${CMAKE_PROJECT_NAME}
-  PRIVATE src/plugin-main.cpp
-          src/core/multiview-config.cpp
-          src/core/config-manager.cpp
-          src/ui/tools-menu.cpp
-          src/ui/grid-editor-widget.cpp
-          src/ui/cell-config-dialog.cpp
-          src/ui/multiview-edit-dialog.cpp
-          src/ui/multiview-manage-dialog.cpp
-          src/ui/template-manage-dialog.cpp
-          src/ui/multiview-window.cpp
-          src/render/multiview-renderer.cpp
+  PRIVATE
+    src/plugin-main.cpp
+    src/api/websocket-api.cpp
+    src/core/multiview-config.cpp
+    src/core/config-manager.cpp
+    src/ui/tools-menu.cpp
+    src/ui/grid-editor-widget.cpp
+    src/ui/cell-config-dialog.cpp
+    src/ui/multiview-edit-dialog.cpp
+    src/ui/multiview-manage-dialog.cpp
+    src/ui/template-manage-dialog.cpp
+    src/ui/multiview-window.cpp
+    src/render/multiview-renderer.cpp
 )
 
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+# deps/ carries the vendored obs-websocket-api.h header
+target_include_directories(
+  ${CMAKE_PROJECT_NAME}
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/deps
+)
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})

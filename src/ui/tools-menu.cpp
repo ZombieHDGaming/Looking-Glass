@@ -107,6 +107,14 @@ void ToolsMenuManager::rebuildMenu()
 			QAction *openAction = mvMenu->addAction(LG_TEXT("ToolsMenu.Open"));
 			connect(openAction, &QAction::triggered, this, [this, name]() { onOpenMultiview(name); });
 
+			// Close action - only meaningful while a window is open, so its
+			// enabled state is refreshed each time the submenu is shown
+			QAction *closeAction = mvMenu->addAction(LG_TEXT("ToolsMenu.Close"));
+			connect(closeAction, &QAction::triggered, this, [this, name]() { onCloseMultiview(name); });
+			connect(mvMenu, &QMenu::aboutToShow, this, [closeAction, name]() {
+				closeAction->setEnabled(MultiviewWindow::findByName(name) != nullptr);
+			});
+
 			// Edit action
 			QAction *editAction = mvMenu->addAction(LG_TEXT("ToolsMenu.Edit"));
 			connect(editAction, &QAction::triggered, this, [this, name]() { onEditMultiview(name); });
@@ -163,6 +171,11 @@ void ToolsMenuManager::onOpenMultiview(const QString &name)
 	MultiviewWindow::openOrFocus(name);
 }
 
+void ToolsMenuManager::onCloseMultiview(const QString &name)
+{
+	MultiviewWindow::closeByName(name);
+}
+
 void ToolsMenuManager::onEditMultiview(const QString &name)
 {
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
@@ -178,25 +191,11 @@ void ToolsMenuManager::onEditMultiview(const QString &name)
 
 void ToolsMenuManager::onSendToMainDisplay(const QString &name)
 {
-	// Open the window if not already open
+	// Open the window if not already open, then move it to the main display
 	MultiviewWindow::openOrFocus(name);
 	MultiviewWindow *win = MultiviewWindow::findByName(name);
-	if (win) {
-		// Set to windowed mode first
-		win->setWindowed();
-
-		// Get primary screen and center the 1280x720 window on it
-		QScreen *primaryScreen = QGuiApplication::primaryScreen();
-		if (primaryScreen) {
-			QRect screenGeom = primaryScreen->geometry();
-			int x = screenGeom.x() + (screenGeom.width() - 1280) / 2;
-			int y = screenGeom.y() + (screenGeom.height() - 720) / 2;
-			win->setGeometry(x, y, 1280, 720);
-		} else {
-			// Fallback if no primary screen found
-			win->resize(1280, 720);
-		}
-	}
+	if (win)
+		win->sendToMainDisplay();
 }
 
 void ToolsMenuManager::onSetFullscreen(const QString &name, int screenIndex)

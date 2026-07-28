@@ -404,6 +404,27 @@ void MultiviewWindow::setWindowed()
 	saveWindowState();
 }
 
+void MultiviewWindow::sendToMainDisplay()
+{
+	// Leave fullscreen first so the window can be repositioned
+	setWindowed();
+
+	// Center a 1280x720 window on the primary screen
+	QScreen *primaryScreen = QGuiApplication::primaryScreen();
+	if (primaryScreen) {
+		QRect screenGeom = primaryScreen->geometry();
+		int x = screenGeom.x() + (screenGeom.width() - 1280) / 2;
+		int y = screenGeom.y() + (screenGeom.height() - 720) / 2;
+		setGeometry(x, y, 1280, 720);
+	} else {
+		// Fallback if no primary screen found
+		resize(1280, 720);
+	}
+
+	raise();
+	activateWindow();
+}
+
 void MultiviewWindow::openEditDialog()
 {
 	MultiviewEditDialog dlg(config_, false, this);
