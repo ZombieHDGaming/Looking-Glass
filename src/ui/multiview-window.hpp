@@ -46,6 +46,7 @@ public:
 	// Window mode controls
 	void setFullscreenOnMonitor(int screenIndex);
 	void setWindowed();
+	void sendToMainDisplay();
 
 	// Static window management
 	static void openOrFocus(const QString &name);
