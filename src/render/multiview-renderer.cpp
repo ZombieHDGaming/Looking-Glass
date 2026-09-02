@@ -112,6 +112,7 @@ void CellRenderer::init(QWidget *surface, const CellConfig &config)
 		obs_display_set_background_color(display_, 0x000000);
 	}
 
+	acquireShownSource();
 	createLabelSource();
 }
 
@@ -122,6 +123,7 @@ void CellRenderer::cleanup()
 		obs_display_destroy(display_);
 		display_ = nullptr;
 	}
+	releaseShownSource();
 	destroyLabelSource();
 	destroyLabelBgTexture();
 	destroyPlaceholderTexture();
@@ -132,7 +134,98 @@ void CellRenderer::cleanup()
 void CellRenderer::updateConfig(const CellConfig &config)
 {
 	config_ = config;
+	acquireShownSource();
 	updateLabelSource();
+}
+
+// --- Displayed scene/source references ---
+//
+// OBS only ticks and captures a source while something declares it visible.
+// Capture sources stop grabbing frames, media sources with "close file when
+// inactive" release their file, and browser sources with "shutdown when not
+// visible" tear down their renderer as soon as the showing count drops to
+// zero. A source that is not in the program or preview scene therefore has a
+// showing count of zero, and a multiview cell rendering it would freeze on the
+// last frame it happened to produce — or stay black if it never produced one.
+//
+// Holding obs_source_inc_showing() for as long as a cell displays a scene or
+// source is what OBS's own multiview and source projectors do, and is what
+// keeps offscreen cells live.
+
+QString CellRenderer::targetSourceName() const
+{
+	switch (config_.widget.type) {
+	case WidgetType::Scene:
+		return config_.widget.sceneName;
+	case WidgetType::Source:
+		return config_.widget.sourceName;
+	default:
+		return QString();
+	}
+}
+
+void CellRenderer::acquireShownSource()
+{
+	releaseShownSource();
+
+	QString name = targetSourceName();
+	if (name.isEmpty())
+		return;
+
+	obs_source_t *source = obs_get_source_by_name(name.toUtf8().constData());
+	if (!source)
+		return; // Picked up later via refreshShownSource() once it exists
+
+	// Show the source before publishing it, so the draw callback never sees a
+	// reference that is not yet counted. inc_showing runs outside the graphics
+	// context because it invokes the source's own show handler.
+	obs_source_inc_showing(source);
+	obs_weak_source_t *weak = obs_source_get_weak_source(source);
+	obs_source_release(source);
+
+	// shownSource_ is read by the draw callback on the graphics thread;
+	// entering the graphics context serializes the swap against it.
+	obs_enter_graphics();
+	shownSource_ = weak;
+	obs_leave_graphics();
+}
+
+void CellRenderer::releaseShownSource()
+{
+	// Only the Qt thread writes shownSource_, so this read needs no guard.
+	if (!shownSource_)
+		return;
+
+	obs_enter_graphics();
+	obs_weak_source_t *weak = shownSource_;
+	shownSource_ = nullptr;
+	obs_leave_graphics();
+
+	// The source may already be gone; the showing reference dies with it.
+	obs_source_t *source = obs_weak_source_get_source(weak);
+	if (source) {
+		obs_source_dec_showing(source);
+		obs_source_release(source);
+	}
+
+	obs_weak_source_release(weak);
+}
+
+void CellRenderer::refreshShownSource()
+{
+	obs_source_t *current = shownSource_ ? obs_weak_source_get_source(shownSource_) : nullptr;
+
+	if (current) {
+		// Still holding a live source under the configured name: nothing
+		// to do. Re-acquiring would needlessly hide and re-show it.
+		const char *currentName = obs_source_get_name(current);
+		bool matches = currentName && targetSourceName() == QString::fromUtf8(currentName);
+		obs_source_release(current);
+		if (matches)
+			return;
+	}
+
+	acquireShownSource();
 }
 
 void CellRenderer::resize(uint32_t width, uint32_t height)
@@ -169,16 +262,14 @@ void CellRenderer::render(uint32_t cx, uint32_t cy)
 		renderCanvas(cx, cy);
 		renderLabel(cx, cy);
 		return;
-	case WidgetType::Scene: {
-		if (!config_.widget.sceneName.isEmpty())
-			source = obs_get_source_by_name(config_.widget.sceneName.toUtf8().constData());
+	case WidgetType::Scene:
+	case WidgetType::Source:
+		// Render the exact source this cell is holding visible. Resolving
+		// through the cached weak reference also avoids a by-name lookup
+		// on every frame of every cell.
+		if (shownSource_)
+			source = obs_weak_source_get_source(shownSource_);
 		break;
-	}
-	case WidgetType::Source: {
-		if (!config_.widget.sourceName.isEmpty())
-			source = obs_get_source_by_name(config_.widget.sourceName.toUtf8().constData());
-		break;
-	}
 	case WidgetType::Placeholder:
 		renderPlaceholderIcon(cx, cy);
 		renderLabel(cx, cy);

@@ -18,6 +18,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
+#include <obs.h>
+
 #include <QWidget>
 #include <QVector>
 #include <QMap>
@@ -55,6 +57,12 @@ public:
 	static void reopenPreviouslyOpen();
 	static MultiviewWindow *findByName(const QString &name);
 
+	// OBS source lifecycle hooks. Connect once at module load and disconnect
+	// at module unload; cells re-resolve the scenes and sources they display
+	// whenever the source list changes.
+	static void connectSourceSignals();
+	static void disconnectSourceSignals();
+
 protected:
 	void resizeEvent(QResizeEvent *event) override;
 	void moveEvent(QMoveEvent *event) override;
@@ -71,6 +79,9 @@ private:
 	void openEditDialog();
 	void updateTitle();
 	void calculateGridMetrics(int &gridW, int &gridH, int &offsetX, int &offsetY, float &cellW, float &cellH) const;
+
+	static void OnSourceListChanged(void *data, calldata_t *cd);
+	static void refreshSourceRefs();
 
 	QString name_;
 	MultiviewConfig config_;

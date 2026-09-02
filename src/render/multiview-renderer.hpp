@@ -43,6 +43,12 @@ public:
 	void updateConfig(const CellConfig &config);
 	void resize(uint32_t width, uint32_t height);
 
+	// Re-resolve the scene/source this cell displays. Must be called on the Qt
+	// thread whenever sources are created, renamed, or removed, so a cell that
+	// pointed at a missing source picks it up once it exists (and lets go of
+	// one that no longer matches).
+	void refreshShownSource();
+
 	// Set the SVG file path for placeholder icon rendering
 	void setPlaceholderSvgPath(const QString &path);
 
@@ -68,8 +74,17 @@ private:
 	void destroyLabelBgTexture();
 	void destroySafeAreaGeometry();
 
+	QString targetSourceName() const;
+	void acquireShownSource();
+	void releaseShownSource();
+
 	obs_display_t *display_ = nullptr;
 	obs_source_t *labelSource_ = nullptr;
+
+	// Scene/source this cell displays. A weak reference is held so the source
+	// can still be destroyed while the cell points at it; the matching
+	// obs_source_inc_showing() reference is released in releaseShownSource().
+	obs_weak_source_t *shownSource_ = nullptr;
 	gs_texture_t *placeholderTexture_ = nullptr;
 	int placeholderTexSize_ = 0;
 	gs_texture_t *labelBgTexture_ = nullptr;

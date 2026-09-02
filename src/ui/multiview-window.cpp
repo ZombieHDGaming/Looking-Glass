@@ -35,6 +35,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QApplication>
 #include <QTimer>
 
+#include <utility>
+
 QMap<QString, MultiviewWindow *> MultiviewWindow::openWindows_;
 
 MultiviewWindow::MultiviewWindow(const QString &name, QWidget *parent) : QWidget(parent, Qt::Window), name_(name)
@@ -137,6 +139,50 @@ void MultiviewWindow::reopenPreviouslyOpen()
 MultiviewWindow *MultiviewWindow::findByName(const QString &name)
 {
 	return openWindows_.value(name, nullptr);
+}
+
+// Cells resolve their scene/source by name and then hold it visible, so the
+// held reference has to follow the source list: a cell pointing at a source
+// that does not exist yet must pick it up when it is created, and one whose
+// source was renamed or removed must let go of it.
+void MultiviewWindow::connectSourceSignals()
+{
+	signal_handler_t *sh = obs_get_signal_handler();
+	if (!sh)
+		return;
+
+	signal_handler_connect(sh, "source_create", OnSourceListChanged, nullptr);
+	signal_handler_connect(sh, "source_destroy", OnSourceListChanged, nullptr);
+	signal_handler_connect(sh, "source_rename", OnSourceListChanged, nullptr);
+}
+
+void MultiviewWindow::disconnectSourceSignals()
+{
+	signal_handler_t *sh = obs_get_signal_handler();
+	if (!sh)
+		return;
+
+	signal_handler_disconnect(sh, "source_create", OnSourceListChanged, nullptr);
+	signal_handler_disconnect(sh, "source_destroy", OnSourceListChanged, nullptr);
+	signal_handler_disconnect(sh, "source_rename", OnSourceListChanged, nullptr);
+}
+
+void MultiviewWindow::OnSourceListChanged(void *, calldata_t *)
+{
+	// Core signals fire on OBS threads. Hop to the Qt thread before touching
+	// window state, and post to the application object rather than to a
+	// window so a window closing concurrently cannot be used after free.
+	QMetaObject::invokeMethod(qApp, &MultiviewWindow::refreshSourceRefs, Qt::QueuedConnection);
+}
+
+void MultiviewWindow::refreshSourceRefs()
+{
+	for (MultiviewWindow *w : std::as_const(openWindows_)) {
+		for (CellRenderer *r : std::as_const(w->renderers_)) {
+			if (r)
+				r->refreshShownSource();
+		}
+	}
 }
 
 void MultiviewWindow::buildGrid()
