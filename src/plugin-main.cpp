@@ -100,6 +100,7 @@ bool obs_module_load(void)
 	s_toolsMenuManager = new ToolsMenuManager();
 
 	obs_frontend_add_event_callback(on_frontend_event, nullptr);
+	MultiviewWindow::connectSourceSignals();
 
 	return true;
 }
@@ -116,6 +117,7 @@ void obs_module_unload(void)
 	obs_log(LOG_INFO, "plugin unloaded");
 
 	obs_frontend_remove_event_callback(on_frontend_event, nullptr);
+	MultiviewWindow::disconnectSourceSignals();
 
 	delete s_toolsMenuManager;
 	s_toolsMenuManager = nullptr;
